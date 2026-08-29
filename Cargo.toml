@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "crates/waver-core",
+    "crates/waver-dsp",
+    "crates/waver-engine",
+    "crates/waver-ui",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+waver-core = { path = "crates/waver-core" }
+waver-dsp = { path = "crates/waver-dsp" }
+waver-engine = { path = "crates/waver-engine" }
+waver-ui = { path = "crates/waver-ui" }
+cpal = "0.18"
+eframe = "0.36"
+rtrb = "0.4"
+thiserror = "2"

@@ -1,0 +1,10 @@
+[package]
+name = "waver-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Graph IR, schedule, and lock-free parameter cells for waver."
+
+[dependencies]
+thiserror.workspace = true
