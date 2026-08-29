@@ -1,8 +1,0 @@
-{
-  "name": "waver",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
-  "install": "cargo build --workspace --locked",
-  "start": "bash .cursor/start.sh"
-}
