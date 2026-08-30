@@ -4,17 +4,19 @@
 //! concrete DSP nodes or on windowing/audio-host crates.
 
 mod command;
+mod compile;
 mod error;
 mod graph;
 mod ids;
 mod param;
+mod ports;
 mod schedule;
 mod status;
 
 pub use command::RtCommand;
-pub use error::GraphError;
-pub use graph::{Edge, Graph, Node, NodeKind, PortRef};
+pub use error::{GraphError, PortDirection};
+pub use graph::{Edge, Graph, Node, NodeKind, PortCounts, PortRef};
 pub use ids::{NodeId, ParamId, PortId};
 pub use param::ParamCell;
-pub use schedule::Schedule;
+pub use schedule::{Link, Schedule};
 pub use status::EngineStatus;
