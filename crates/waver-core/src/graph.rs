@@ -1,6 +1,6 @@
 //! Editable graph IR. Compiled on the GUI thread, never on the audio callback.
 
-use crate::{GraphError, NodeId, PortId, Schedule};
+use crate::{CompiledPatch, GraphError, NodeId, ParamRegistry, PortId, Schedule};
 
 pub use crate::ports::PortCounts;
 
@@ -96,8 +96,38 @@ impl Graph {
     }
 
     /// Append a cable. Fan-in summing is recorded in the compiled [`Schedule`].
+    /// Duplicate `(from, to)` pairs are ignored.
     pub fn connect(&mut self, from: PortRef, to: PortRef) {
+        if self
+            .edges
+            .iter()
+            .any(|edge| edge.from == from && edge.to == to)
+        {
+            return;
+        }
         self.edges.push(Edge { from, to });
+    }
+
+    /// Remove a cable by index in [`Self::edges`].
+    pub fn disconnect_edge(&mut self, index: usize) -> bool {
+        if index >= self.edges.len() {
+            return false;
+        }
+        self.edges.remove(index);
+        true
+    }
+
+    /// Compile graph into a [`CompiledPatch`], optionally preserving parameter values.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Self::compile`].
+    pub fn compile_patch(
+        &self,
+        existing: Option<&ParamRegistry>,
+    ) -> Result<CompiledPatch, GraphError> {
+        let schedule = self.compile()?;
+        Ok(CompiledPatch::from_schedule(schedule, existing))
     }
 
     /// Next id that would be assigned by [`Self::insert`].
