@@ -4,6 +4,7 @@ use eframe::egui;
 use waver_core::{Node, NodeKind, ParamId, ParamRegistry, PortId, PortRef};
 
 use super::cable::{JackPos, JACK_HIT_RADIUS};
+use super::debug_log;
 use super::knob::{wave_selector, KnobScale, rotary_knob};
 
 const VCO_WIDTH: f32 = 200.0;
@@ -136,6 +137,50 @@ fn show_vco_node(
             });
         });
 
+    // #region agent log
+    {
+        let r = &area_response.response;
+        let ptr = ui.input(|i| i.pointer.interact_pos()).unwrap_or(egui::Pos2::ZERO);
+        if r.clicked()
+            || r.dragged()
+            || r.drag_started()
+            || ui.input(|i| i.pointer.primary_clicked() || i.pointer.secondary_clicked() || i.pointer.any_pressed())
+        {
+            debug_log::agent_log(
+                "A",
+                "editor/node_view.rs:vco_area",
+                "area_response",
+                &format!(
+                    "{{\"node\":{},\"ptr\":[{:.1},{:.1}],\"area_rect\":[{:.1},{:.1},{:.1},{:.1}],\"hovered\":{},\"clicked\":{},\"drag_started\":{},\"dragged\":{},\"contains_ptr\":{},\"jacks\":[{}]}}",
+                    node.id.raw(),
+                    ptr.x,
+                    ptr.y,
+                    r.rect.min.x,
+                    r.rect.min.y,
+                    r.rect.max.x,
+                    r.rect.max.y,
+                    r.hovered(),
+                    r.clicked(),
+                    r.drag_started(),
+                    r.dragged(),
+                    r.rect.contains(ptr),
+                    jacks
+                        .iter()
+                        .map(|j| format!(
+                            "{{\"c\":[{:.1},{:.1}],\"out\":{},\"d\":{:.1}}}",
+                            j.center.x,
+                            j.center.y,
+                            j.is_output,
+                            j.center.distance(ptr)
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+            );
+        }
+    }
+    // #endregion
+
     NodeLayout {
         rect: area_response.response.rect,
         jacks,
@@ -226,6 +271,51 @@ fn show_simple_node(
                 }
             });
         });
+
+    // #region agent log
+    {
+        let r = &area_response.response;
+        let ptr = ui.input(|i| i.pointer.interact_pos()).unwrap_or(egui::Pos2::ZERO);
+        if r.clicked()
+            || r.dragged()
+            || r.drag_started()
+            || ui.input(|i| i.pointer.primary_clicked() || i.pointer.secondary_clicked() || i.pointer.any_pressed())
+        {
+            debug_log::agent_log(
+                "A",
+                "editor/node_view.rs:simple_area",
+                "area_response",
+                &format!(
+                    "{{\"node\":{},\"kind\":\"{:?}\",\"ptr\":[{:.1},{:.1}],\"area_rect\":[{:.1},{:.1},{:.1},{:.1}],\"hovered\":{},\"clicked\":{},\"drag_started\":{},\"dragged\":{},\"contains_ptr\":{},\"jacks\":[{}]}}",
+                    node.id.raw(),
+                    node.kind,
+                    ptr.x,
+                    ptr.y,
+                    r.rect.min.x,
+                    r.rect.min.y,
+                    r.rect.max.x,
+                    r.rect.max.y,
+                    r.hovered(),
+                    r.clicked(),
+                    r.drag_started(),
+                    r.dragged(),
+                    r.rect.contains(ptr),
+                    jacks
+                        .iter()
+                        .map(|j| format!(
+                            "{{\"c\":[{:.1},{:.1}],\"out\":{},\"d\":{:.1}}}",
+                            j.center.x,
+                            j.center.y,
+                            j.is_output,
+                            j.center.distance(ptr)
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
+            );
+        }
+    }
+    // #endregion
 
     let _ = height;
     NodeLayout {

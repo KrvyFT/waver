@@ -1,6 +1,7 @@
 //! Patch canvas: nodes, cables, interaction.
 
 mod cable;
+mod debug_log;
 mod knob;
 mod node_view;
 
@@ -82,6 +83,43 @@ impl PatchEditor {
         let mut all_jacks: Vec<JackPos> = Vec::new();
         let params = patch.compiled.as_ref().map(|p| p.params.clone());
 
+        // #region agent log
+        {
+            let primary = ui.input(|i| i.pointer.primary_down());
+            let secondary = ui.input(|i| i.pointer.secondary_down());
+            if response.clicked()
+                || response.dragged()
+                || response.drag_started()
+                || response.drag_stopped()
+                || secondary
+                || ui.input(|i| i.pointer.secondary_clicked())
+                || (primary && (response.hovered() || self.drag_node.is_some()))
+            {
+                let p = pointer.unwrap_or(egui::Pos2::ZERO);
+                debug_log::agent_log(
+                    "A",
+                    "editor/mod.rs:canvas",
+                    "canvas_pointer",
+                    &format!(
+                        "{{\"ptr\":[{:.1},{:.1}],\"hovered\":{},\"clicked\":{},\"drag_started\":{},\"dragged\":{},\"drag_stopped\":{},\"primary_down\":{},\"secondary_down\":{},\"secondary_clicked\":{},\"drag_node\":{},\"params_present\":{}}}",
+                        p.x,
+                        p.y,
+                        response.hovered(),
+                        response.clicked(),
+                        response.drag_started(),
+                        response.dragged(),
+                        response.drag_stopped(),
+                        primary,
+                        secondary,
+                        ui.input(|i| i.pointer.secondary_clicked()),
+                        self.drag_node.map(|id| id.raw()).unwrap_or(u32::MAX),
+                        params.is_some()
+                    ),
+                );
+            }
+        }
+        // #endregion
+
         let nodes: Vec<_> = patch.graph.nodes().to_vec();
         for node in &nodes {
             let pos = patch.position(node.id);
@@ -94,12 +132,43 @@ impl PatchEditor {
                 params.as_ref(),
             );
             self.jack_cache.insert(node.id, layout.jacks.clone());
-            all_jacks.extend(layout.jacks);
+            all_jacks.extend(layout.jacks.clone());
 
             let header_rect = egui::Rect::from_min_size(
                 layout.rect.min,
                 egui::vec2(layout.rect.width(), NODE_HEADER_HEIGHT),
             );
+
+            // #region agent log
+            if response.clicked() || response.drag_started() || response.dragged() {
+                let p = pointer.unwrap_or(egui::Pos2::ZERO);
+                debug_log::agent_log(
+                    "B",
+                    "editor/mod.rs:node_drag",
+                    "node_hit_test",
+                    &format!(
+                        "{{\"node\":{},\"ptr\":[{:.1},{:.1}],\"pos\":[{:.1},{:.1}],\"in_header\":{},\"in_body\":{},\"header\":[{:.1},{:.1},{:.1},{:.1}],\"body\":[{:.1},{:.1},{:.1},{:.1}],\"drag_started\":{},\"clicked\":{}}}",
+                        node.id.raw(),
+                        p.x,
+                        p.y,
+                        pos.x,
+                        pos.y,
+                        header_rect.contains(p),
+                        layout.rect.contains(p),
+                        header_rect.min.x,
+                        header_rect.min.y,
+                        header_rect.max.x,
+                        header_rect.max.y,
+                        layout.rect.min.x,
+                        layout.rect.min.y,
+                        layout.rect.max.x,
+                        layout.rect.max.y,
+                        response.drag_started(),
+                        response.clicked()
+                    ),
+                );
+            }
+            // #endregion
 
             if response.clicked() {
                 if header_rect.contains(pointer.unwrap_or(egui::Pos2::ZERO)) {
@@ -114,6 +183,19 @@ impl PatchEditor {
             if response.drag_started()
                 && header_rect.contains(pointer.unwrap_or(egui::Pos2::ZERO))
             {
+                // #region agent log
+                debug_log::agent_log(
+                    "B",
+                    "editor/mod.rs:node_drag",
+                    "drag_node_acquired",
+                    &format!(
+                        "{{\"node\":{},\"offset\":[{:.1},{:.1}]}}",
+                        node.id.raw(),
+                        pointer.unwrap().x - pos.x,
+                        pointer.unwrap().y - pos.y
+                    ),
+                );
+                // #endregion
                 self.drag_node = Some(node.id);
                 self.drag_offset = pointer.unwrap() - pos;
             }
@@ -121,10 +203,33 @@ impl PatchEditor {
 
         if response.dragged() {
             if let (Some(id), Some(p)) = (self.drag_node, pointer) {
+                // #region agent log
+                debug_log::agent_log(
+                    "B",
+                    "editor/mod.rs:node_drag",
+                    "drag_node_move",
+                    &format!(
+                        "{{\"node\":{},\"new_pos\":[{:.1},{:.1}]}}",
+                        id.raw(),
+                        (p - self.drag_offset).x,
+                        (p - self.drag_offset).y
+                    ),
+                );
+                // #endregion
                 patch.set_position(id, p - self.drag_offset);
             }
         }
         if response.drag_stopped() {
+            // #region agent log
+            if self.drag_node.is_some() {
+                debug_log::agent_log(
+                    "B",
+                    "editor/mod.rs:node_drag",
+                    "drag_node_stopped",
+                    &format!("{{\"node\":{}}}", self.drag_node.unwrap().raw()),
+                );
+            }
+            // #endregion
             self.drag_node = None;
         }
 
@@ -182,17 +287,74 @@ impl PatchEditor {
         jacks: &[JackPos],
     ) {
         if ui.input(|i| i.pointer.secondary_clicked()) {
+            // #region agent log
+            let edge_count = patch.graph.edges().len();
+            debug_log::agent_log(
+                "C",
+                "editor/mod.rs:cable_delete",
+                "secondary_clicked",
+                &format!(
+                    "{{\"ptr\":[{:.1},{:.1}],\"edge_count\":{},\"jack_count\":{}}}",
+                    pointer.x,
+                    pointer.y,
+                    edge_count,
+                    jacks.len()
+                ),
+            );
+            // #endregion
             for (idx, edge) in patch.graph.edges().iter().enumerate() {
                 let from = jacks.iter().find(|j| j.port == edge.from);
                 let to = jacks.iter().find(|j| j.port == edge.to);
                 if let (Some(from), Some(to)) = (from, to) {
                     let mid = from.center.lerp(to.center, 0.5);
-                    if pointer.distance(mid) < 16.0 {
+                    let dist = pointer.distance(mid);
+                    // #region agent log
+                    debug_log::agent_log(
+                        "C",
+                        "editor/mod.rs:cable_delete",
+                        "edge_mid_hit_test",
+                        &format!(
+                            "{{\"idx\":{},\"from\":[{:.1},{:.1}],\"to\":[{:.1},{:.1}],\"mid\":[{:.1},{:.1}],\"dist\":{:.2},\"hit\":{}}}",
+                            idx,
+                            from.center.x,
+                            from.center.y,
+                            to.center.x,
+                            to.center.y,
+                            mid.x,
+                            mid.y,
+                            dist,
+                            dist < 16.0
+                        ),
+                    );
+                    // #endregion
+                    if dist < 16.0 {
+                        // #region agent log
+                        debug_log::agent_log(
+                            "C",
+                            "editor/mod.rs:cable_delete",
+                            "disconnect_attempt",
+                            &format!("{{\"idx\":{},\"ok\":true}}", idx),
+                        );
+                        // #endregion
                         if patch.disconnect_edge(idx) {
                             patch.recompile(commands);
                         }
                         return;
                     }
+                } else {
+                    // #region agent log
+                    debug_log::agent_log(
+                        "D",
+                        "editor/mod.rs:cable_delete",
+                        "missing_jack_for_edge",
+                        &format!(
+                            "{{\"idx\":{},\"has_from\":{},\"has_to\":{}}}",
+                            idx,
+                            from.is_some(),
+                            to.is_some()
+                        ),
+                    );
+                    // #endregion
                 }
             }
             self.cable.cancel();
@@ -200,7 +362,38 @@ impl PatchEditor {
         }
 
         if ui.input(|i| i.pointer.primary_clicked()) {
-            if let Some(jack) = jack_at(pointer, jacks) {
+            let hit = jack_at(pointer, jacks);
+            // #region agent log
+            let nearest = jacks
+                .iter()
+                .map(|j| {
+                    (
+                        j.center.distance(pointer),
+                        j.center,
+                        j.is_output,
+                        j.port.node.raw(),
+                    )
+                })
+                .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+            debug_log::agent_log(
+                "D",
+                "editor/mod.rs:jack_click",
+                "primary_clicked_jack_scan",
+                &format!(
+                    "{{\"ptr\":[{:.1},{:.1}],\"hit\":{},\"nearest_dist\":{:.2},\"nearest_jack\":[{:.1},{:.1}],\"nearest_out\":{},\"nearest_node\":{},\"jack_count\":{}}}",
+                    pointer.x,
+                    pointer.y,
+                    hit.is_some(),
+                    nearest.map(|n| n.0).unwrap_or(-1.0),
+                    nearest.map(|n| n.1.x).unwrap_or(0.0),
+                    nearest.map(|n| n.1.y).unwrap_or(0.0),
+                    nearest.map(|n| n.2).unwrap_or(false),
+                    nearest.map(|n| n.3).unwrap_or(u32::MAX),
+                    jacks.len()
+                ),
+            );
+            // #endregion
+            if let Some(jack) = hit {
                 match &self.cable {
                     CableState::Idle => {
                         if jack.is_output {

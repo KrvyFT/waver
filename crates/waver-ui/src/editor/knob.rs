@@ -2,6 +2,8 @@
 
 use eframe::egui;
 
+use super::debug_log;
+
 const KNOB_RADIUS: f32 = 18.0;
 const DRAG_SENSITIVITY: f32 = 0.005;
 
@@ -27,6 +29,39 @@ pub fn rotary_knob(
             egui::Sense::click_and_drag(),
         );
 
+        // #region agent log
+        if response.hovered()
+            || response.clicked()
+            || response.dragged()
+            || response.drag_started()
+            || response.double_clicked()
+        {
+            let ptr = ui.input(|i| i.pointer.interact_pos()).unwrap_or(egui::Pos2::ZERO);
+            debug_log::agent_log(
+                "E",
+                "editor/knob.rs:rotary",
+                "knob_interaction",
+                &format!(
+                    "{{\"label\":\"{}\",\"ptr\":[{:.1},{:.1}],\"rect\":[{:.1},{:.1},{:.1},{:.1}],\"hovered\":{},\"clicked\":{},\"drag_started\":{},\"dragged\":{},\"double\":{},\"delta_y\":{:.2},\"value_before\":{:.4}}}",
+                    label,
+                    ptr.x,
+                    ptr.y,
+                    rect.min.x,
+                    rect.min.y,
+                    rect.max.x,
+                    rect.max.y,
+                    response.hovered(),
+                    response.clicked(),
+                    response.drag_started(),
+                    response.dragged(),
+                    response.double_clicked(),
+                    response.drag_delta().y,
+                    *value
+                ),
+            );
+        }
+        // #endregion
+
         if response.double_clicked() {
             *value = default_for_range(&range, scale);
         }
@@ -47,9 +82,30 @@ pub fn rotary_knob(
                         .clamp(*range.start(), *range.end())
                 }
             };
+            // #region agent log
+            debug_log::agent_log(
+                "E",
+                "editor/knob.rs:rotary",
+                "knob_value_changed",
+                &format!(
+                    "{{\"label\":\"{}\",\"value_after\":{:.4},\"delta\":{:.4}}}",
+                    label, *value, delta
+                ),
+            );
+            // #endregion
         }
 
         if ui.is_enabled() {
+            // #region agent log
+            if response.drag_started() {
+                debug_log::agent_log(
+                    "E",
+                    "editor/knob.rs:cursor",
+                    "set_cursor_grab",
+                    &format!("{{\"label\":\"{}\"}}", label),
+                );
+            }
+            // #endregion
             ui.ctx().set_cursor_icon(if response.hovered() || response.dragged() {
                 egui::CursorIcon::Grab
             } else {
@@ -144,6 +200,14 @@ pub fn wave_selector(ui: &mut egui::Ui, value: &mut f32) {
                     )
                     .clicked()
                 {
+                    // #region agent log
+                    debug_log::agent_log(
+                        "E",
+                        "editor/knob.rs:wave",
+                        "wave_button_clicked",
+                        &format!("{{\"name\":\"{}\",\"idx\":{}}}", name, idx),
+                    );
+                    // #endregion
                     wave = idx;
                 }
             }
