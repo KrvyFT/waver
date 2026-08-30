@@ -45,7 +45,10 @@ fn run() -> Result<(), AppError> {
     eframe::run_native(
         "waver",
         options,
-        Box::new(move |_cc| Ok(Box::new(AppShell { app, _audio: audio }))),
+        Box::new(move |cc| {
+            waver_ui::setup_fonts(&cc.egui_ctx);
+            Ok(Box::new(AppShell { app, _audio: audio }))
+        }),
     )
     .map_err(|err| AppError::Eframe(err.to_string()))
 }
