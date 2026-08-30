@@ -2,6 +2,8 @@
 
 use crate::{GraphError, NodeId, PortId, Schedule};
 
+pub use crate::ports::PortCounts;
+
 /// Built-in module kinds. DSP implementations live in `waver-dsp`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NodeKind {
@@ -13,6 +15,8 @@ pub enum NodeKind {
     Mixer,
     Output,
     Silence,
+    /// One-block delay line; inserted by the compiler to break feedback loops.
+    Delay,
 }
 
 /// A module instance in the patch.
@@ -43,9 +47,6 @@ pub struct PortRef {
 }
 
 /// Patch being edited in the UI.
-///
-/// `compile` is a stub: it always returns an empty [`Schedule`]. Kahn sorting
-/// and delay insertion come in a later change.
 #[derive(Clone, Debug, Default)]
 pub struct Graph {
     nodes: Vec<Node>,
@@ -69,6 +70,11 @@ impl Graph {
         &self.edges
     }
 
+    /// Look up a node by id.
+    pub fn node(&self, id: NodeId) -> Option<&Node> {
+        self.nodes.iter().find(|node| node.id == id)
+    }
+
     /// Append a node and return its id.
     pub fn insert(&mut self, kind: NodeKind) -> NodeId {
         let id = NodeId::new(self.next_id);
@@ -77,41 +83,81 @@ impl Graph {
         id
     }
 
-    /// Append a cable. Fan-in summing is applied at compile time (not yet).
+    /// Remove a node and any cables touching it.
+    pub fn remove(&mut self, id: NodeId) -> bool {
+        let before = self.nodes.len();
+        self.nodes.retain(|node| node.id != id);
+        if self.nodes.len() == before {
+            return false;
+        }
+        self.edges
+            .retain(|edge| edge.from.node != id && edge.to.node != id);
+        true
+    }
+
+    /// Append a cable. Fan-in summing is recorded in the compiled [`Schedule`].
     pub fn connect(&mut self, from: PortRef, to: PortRef) {
         self.edges.push(Edge { from, to });
     }
 
+    /// Next id that would be assigned by [`Self::insert`].
+    pub(crate) fn next_node_id(&self) -> u32 {
+        self.next_id
+    }
+
     /// Build an audio-thread schedule.
+    ///
+    /// Validates ports, topologically sorts with Kahn's algorithm, and inserts
+    /// [`NodeKind::Delay`] nodes when feedback would otherwise leave a cycle.
     ///
     /// # Errors
     ///
-    /// Reserved for cycle detection. The stub never fails.
+    /// Returns [`GraphError`] when ports are invalid, a self-loop is present,
+    /// or a cycle cannot be broken.
     pub fn compile(&self) -> Result<Schedule, GraphError> {
-        Ok(Schedule::empty())
+        crate::compile::compile_graph(self)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Graph, NodeKind};
+    use super::{Graph, NodeKind, PortId, PortRef};
+
+    fn port(node: crate::NodeId, index: u32) -> PortRef {
+        PortRef {
+            node,
+            port: PortId::new(index),
+        }
+    }
 
     #[test]
     fn empty_graph_compiles_to_empty_schedule() {
         let graph = Graph::new();
-        let schedule = graph
-            .compile()
-            .expect("empty graph must compile in the stub");
+        let schedule = graph.compile().expect("empty graph compiles");
         assert!(schedule.is_empty());
         assert!(schedule.order().is_empty());
     }
 
     #[test]
-    fn insert_does_not_change_stub_schedule() {
+    fn disconnected_nodes_all_appear_in_order() {
         let mut graph = Graph::new();
-        graph.insert(NodeKind::Vco);
-        graph.insert(NodeKind::Output);
-        let schedule = graph.compile().expect("stub compile");
-        assert!(schedule.is_empty());
+        let vco = graph.insert(NodeKind::Vco);
+        let out = graph.insert(NodeKind::Output);
+        let schedule = graph.compile().expect("disconnected graph compiles");
+        assert_eq!(schedule.order().len(), 2);
+        assert!(schedule.order().contains(&vco));
+        assert!(schedule.order().contains(&out));
+    }
+
+    #[test]
+    fn remove_node_drops_incident_edges() {
+        let mut graph = Graph::new();
+        let vco = graph.insert(NodeKind::Vco);
+        let out = graph.insert(NodeKind::Output);
+        graph.connect(port(vco, 0), port(out, 0));
+        assert!(graph.remove(vco));
+        assert_eq!(graph.edges().len(), 0);
+        let schedule = graph.compile().expect("single output node");
+        assert_eq!(schedule.order(), &[out]);
     }
 }
