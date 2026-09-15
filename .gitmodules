@@ -1,0 +1,16 @@
+[submodule "crates/waver-core"]
+	path = crates/waver-core
+	url = https://github.com/KrvyFT/waver-core.git
+	branch = main
+[submodule "crates/waver-dsp"]
+	path = crates/waver-dsp
+	url = https://github.com/KrvyFT/waver-dsp.git
+	branch = main
+[submodule "crates/waver-engine"]
+	path = crates/waver-engine
+	url = https://github.com/KrvyFT/waver-engine.git
+	branch = main
+[submodule "crates/waver-ui"]
+	path = crates/waver-ui
+	url = https://github.com/KrvyFT/waver-ui.git
+	branch = main
