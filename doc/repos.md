@@ -23,14 +23,6 @@ git clone --recurse-submodules https://github.com/KrvyFT/waver.git
 git submodule update --init --recursive
 ```
 
-从 subtree 迁到 submodule（仅需一次）：
-
-```bash
-./scripts/migrate-to-submodules.sh
-git commit -m "chore: track workspace crates as git submodules"
-git push
-```
-
 ## 在某个 crate 里独立提交 / 推送
 
 ```bash
@@ -62,4 +54,3 @@ git push
 1. **crate 源码的 commit 发生在子仓库**；伞仓 commit 主要更新 submodule 指针、二进制、`doc/`、`scripts/`。
 2. 子模块默认跟踪远程 `main`。
 3. 不要在未初始化 submodule 的空目录里直接写文件。
-4. 以前的 subtree 远程名 `crate-waver-*` 可删：`git remote remove crate-waver-core` 等（可选清理）。
