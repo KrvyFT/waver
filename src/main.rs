@@ -37,7 +37,8 @@ fn run() -> Result<(), AppError> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([960.0, 640.0])
+            .with_inner_size([1440.0, 960.0])
+            .with_min_inner_size([1000.0, 640.0])
             .with_title("waver"),
         ..Default::default()
     };
@@ -47,6 +48,7 @@ fn run() -> Result<(), AppError> {
         options,
         Box::new(move |cc| {
             waver_ui::setup_fonts(&cc.egui_ctx);
+            waver_ui::setup_theme(&cc.egui_ctx);
             Ok(Box::new(AppShell { app, _audio: audio }))
         }),
     )
