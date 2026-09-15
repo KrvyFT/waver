@@ -8,29 +8,13 @@ use crate::{NodeId, NodeKind, ParamCell, ParamId, Schedule};
 /// Default parameter value for a `(NodeKind, ParamId)` slot.
 #[must_use]
 pub fn default_param_value(kind: NodeKind, param: ParamId) -> f32 {
-    match kind {
-        NodeKind::Vco => match param.raw() {
-            0 => 440.0, // freq Hz
-            1 => 0.5,   // amp
-            2 => 0.0,   // wave (sine)
-            _ => 0.0,
-        },
-        _ => 0.0,
-    }
+    kind.desc().default_param(param)
 }
 
 /// Human-readable parameter labels for the UI (index = ParamId raw).
 #[must_use]
 pub fn param_label(kind: NodeKind, param: ParamId) -> &'static str {
-    match kind {
-        NodeKind::Vco => match param.raw() {
-            0 => "频率 (Hz)",
-            1 => "振幅",
-            2 => "波形",
-            _ => "参数",
-        },
-        _ => "参数",
-    }
+    kind.desc().param_label(param)
 }
 
 /// Lock-free parameter cells keyed by node + param index.
