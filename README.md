@@ -35,9 +35,9 @@ cargo test --workspace
 | [doc/modules.md](doc/modules.md) | `ModuleDesc` 与如何添加模块 |
 | [doc/audio-thread.md](doc/audio-thread.md) | 实时约束、引擎、命令队列 |
 | [doc/ui.md](doc/ui.md) | 三栏工作区与编辑状态 |
-| [doc/repos.md](doc/repos.md) | 伞仓 + 各 crate 独立远程（subtree） |
+| [doc/repos.md](doc/repos.md) | 伞仓 + 各 crate 独立仓库（git submodule） |
 
-本地目录仍是 `crates/waver-*`，改代码方式不变；需要时用 `./scripts/repos.sh push` 同步到各子仓。
+本地仍是 `crates/waver-*`。每个 crate 可独立 clone / 在其目录内 `git push`；联调在伞仓用 path 依赖。详见 [doc/repos.md](doc/repos.md)。
 
 ## License
 

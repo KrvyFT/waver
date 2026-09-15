@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# Sync workspace crates to/from per-crate GitHub remotes via git subtree.
+# Helpers for crate submodules under crates/.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 ORG="${WAVER_GITHUB_ORG:-KrvyFT}"
-BRANCH="${WAVER_CRATE_BRANCH:-main}"
 
 declare -A CRATES=(
-  [core]="waver-core:crates/waver-core"
-  [dsp]="waver-dsp:crates/waver-dsp"
-  [engine]="waver-engine:crates/waver-engine"
-  [ui]="waver-ui:crates/waver-ui"
+  [core]="waver-core"
+  [dsp]="waver-dsp"
+  [engine]="waver-engine"
+  [ui]="waver-ui"
 )
 
 usage() {
@@ -20,16 +19,20 @@ usage() {
 Usage: scripts/repos.sh <command> [crate...]
 
 Commands:
-  remotes   Add git remotes for each crate (idempotent)
-  push      git subtree push to crate remotes
-  pull      git subtree pull from crate remotes (onto current branch)
-  status    Show remotes and whether working tree is clean
+  status    Submodule status (+ dirty check inside each)
+  push      In each crate: git push (current branch → its origin)
+  pull      git submodule update --init --remote --merge
+  sync      After crate commits: stage updated submodule pointers in umbrella
 
 Crate aliases: core dsp engine ui  (default: all)
 
-Env:
-  WAVER_GITHUB_ORG     default KrvyFT
-  WAVER_CRATE_BRANCH   default main
+Typical flow after editing crates/waver-core:
+  cd crates/waver-core
+  git add -A && git commit -m "…" && git push
+  cd ../..
+  ./scripts/repos.sh sync
+  git commit -m "chore: bump waver-core submodule"
+  git push
 EOF
 }
 
@@ -52,85 +55,69 @@ resolve_aliases() {
   done
 }
 
-parse_entry() {
-  # entry = "repo:prefix"
-  REPO="${1%%:*}"
-  PREFIX="${1#*:}"
-  REMOTE="crate-$REPO"
-  URL="https://github.com/${ORG}/${REPO}.git"
+path_for() {
+  echo "crates/${CRATES[$1]}"
 }
 
-cmd_remotes() {
-  local alias entry
+cmd_status() {
+  git submodule status
+  echo
+  local alias path
   while read -r alias; do
-    parse_entry "${CRATES[$alias]}"
-    if git remote get-url "$REMOTE" >/dev/null 2>&1; then
-      git remote set-url "$REMOTE" "$URL"
-      echo "updated remote $REMOTE -> $URL"
-    else
-      git remote add "$REMOTE" "$URL"
-      echo "added remote $REMOTE -> $URL"
+    path="$(path_for "$alias")"
+    if [[ ! -e "$path/.git" && ! -f "$path/.git" ]]; then
+      echo "$alias  NOT initialized (run: git submodule update --init)"
+      continue
     fi
+    (
+      cd "$path"
+      branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+      dirty=""
+      [[ -n "$(git status --porcelain)" ]] && dirty=" DIRTY"
+      remote="$(git remote get-url origin 2>/dev/null || echo '(no origin)')"
+      echo "$alias  $branch$dirty  $remote"
+    )
   done < <(resolve_aliases "$@")
 }
 
-require_clean() {
-  if [[ -n "$(git status --porcelain)" ]]; then
-    echo "working tree not clean; commit or stash before subtree push/pull" >&2
-    git status -sb >&2
-    exit 1
-  fi
-}
-
 cmd_push() {
-  require_clean
-  cmd_remotes "$@"
-  local alias
+  local alias path
   while read -r alias; do
-    parse_entry "${CRATES[$alias]}"
-    echo "==> subtree push $PREFIX -> $REMOTE:$BRANCH"
-    git subtree push --prefix="$PREFIX" "$REMOTE" "$BRANCH"
+    path="$(path_for "$alias")"
+    echo "==> push $path"
+    (
+      cd "$path"
+      if [[ -n "$(git status --porcelain)" ]]; then
+        echo "dirty worktree in $path; commit first" >&2
+        exit 1
+      fi
+      git push -u origin HEAD
+    )
   done < <(resolve_aliases "$@")
 }
 
 cmd_pull() {
-  require_clean
-  cmd_remotes "$@"
-  local alias
-  while read -r alias; do
-    parse_entry "${CRATES[$alias]}"
-    echo "==> subtree pull $REMOTE:$BRANCH -> $PREFIX"
-    git subtree pull --prefix="$PREFIX" "$REMOTE" "$BRANCH" --squash
-  done < <(resolve_aliases "$@")
+  git submodule update --init --remote --merge
 }
 
-cmd_status() {
-  if [[ -n "$(git status --porcelain)" ]]; then
-    echo "working tree: DIRTY"
-    git status -sb
-  else
-    echo "working tree: clean"
-  fi
-  echo
-  local alias
+cmd_sync() {
+  local alias path
   while read -r alias; do
-    parse_entry "${CRATES[$alias]}"
-    if git remote get-url "$REMOTE" >/dev/null 2>&1; then
-      echo "$alias  $PREFIX  $(git remote get-url "$REMOTE")"
-    else
-      echo "$alias  $PREFIX  (no remote; run: $0 remotes)"
-    fi
-  done < <(all_aliases)
+    path="$(path_for "$alias")"
+    git add "$path"
+  done < <(resolve_aliases "$@")
+  git status -sb
+  echo "staged submodule pointers; commit in the umbrella when ready"
 }
 
 main() {
   local cmd="${1:-}"
   shift || true
   case "$cmd" in
-    remotes) cmd_remotes "$@" ;;
+    status) cmd_status "$@" ;;
     push) cmd_push "$@" ;;
-    pull) cmd_pull "$@" ;;
-    status) cmd_status ;;
+    pull) cmd_pull ;;
+    sync) cmd_sync "$@" ;;
     -h | --help | help | "") usage ;;
     *)
       echo "unknown command: $cmd" >&2

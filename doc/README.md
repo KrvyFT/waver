@@ -7,6 +7,6 @@
 | [modules.md](modules.md) | 静态模块描述符与扩展清单 |
 | [audio-thread.md](audio-thread.md) | Engine、RtCommand、实时安全 |
 | [ui.md](ui.md) | Patch 编辑器与 `PatchState` |
-| [repos.md](repos.md) | 多远程 / subtree 同步 |
+| [repos.md](repos.md) | 多仓库 / git submodule |
 
 源码级 API 以各 crate 的 `//!` / `///` 为准；本文档描述约定与扩展流程。

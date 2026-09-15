@@ -1,51 +1,65 @@
-# 多仓库布局（保留本地目录结构）
+# 多仓库布局（git submodule）
 
-日常开发仍在本仓库（伞仓）一次改完；各 crate 另有独立 GitHub 远程，用 **git subtree** 同步。本地路径不变，`cargo run` / 跳转定义体验与现在相同。
+每个 crate 是**独立 Git 仓库**，在伞仓里以 submodule 挂在 `crates/` 下。  
+本地目录结构不变，可继续 `cargo run`；也可单独 clone / 在 crate 目录里 `git push`。
 
-## 仓库对照
+## 仓库
 
-| 本地路径 | 远程 |
-|----------|------|
-| 伞仓根（本仓库） | https://github.com/KrvyFT/waver |
+| 本地路径 | 独立仓库 |
+|----------|----------|
+| 伞仓根 | https://github.com/KrvyFT/waver |
 | `crates/waver-core` | https://github.com/KrvyFT/waver-core |
 | `crates/waver-dsp` | https://github.com/KrvyFT/waver-dsp |
 | `crates/waver-engine` | https://github.com/KrvyFT/waver-engine |
 | `crates/waver-ui` | https://github.com/KrvyFT/waver-ui |
 
-Cargo 仍用 **path 依赖**（见根 `Cargo.toml` 的 `[workspace.dependencies]`）。子仓是源码镜像，不是给「只 clone 单个 crate 再拼 workspace」用的；独立 clone 时 `*.workspace = true` 无法解析。
+Cargo 仍用伞仓 **path 依赖**。单独 clone 某个 crate 时，因 `*.workspace = true`，**不能**直接 `cargo build`；开发与联调以伞仓为准。
 
-## 日常改代码
-
-和平时一样：在 `crates/...` 里改 → 在伞仓提交 → `cargo test --workspace`。
-
-推送到各子仓：
+## 首次拿到伞仓
 
 ```bash
-./scripts/repos.sh push          # 推送全部 crate
+git clone --recurse-submodules https://github.com/KrvyFT/waver.git
+# 若已 clone 未拉子模块：
+git submodule update --init --recursive
+```
+
+从 subtree 迁到 submodule（仅需一次）：
+
+```bash
+./scripts/migrate-to-submodules.sh
+git commit -m "chore: track workspace crates as git submodules"
+git push
+```
+
+## 在某个 crate 里独立提交 / 推送
+
+```bash
+cd crates/waver-core
+git checkout -b my-change
+# 改代码…
+git add -A && git commit -m "feat: …"
+git push -u origin HEAD
+cd ../..
+./scripts/repos.sh sync          # 把伞仓里的 submodule 指针 staged
+git commit -m "chore: bump waver-core"
+git push
+```
+
+跨多个 crate 改完时：分别在各自目录 commit + push，再 `./scripts/repos.sh sync` 一次，伞仓记全部新指针。
+
+## 助手命令
+
+```bash
+./scripts/repos.sh status        # 各子模块分支 / 是否脏
+./scripts/repos.sh push          # 各 crate 目录 git push
 ./scripts/repos.sh push core     # 只推 waver-core
+./scripts/repos.sh pull          # 按远程更新子模块
+./scripts/repos.sh sync          # git add crates/* 指针
 ```
-
-从子仓拉回（少用；一般以伞仓为准）：
-
-```bash
-./scripts/repos.sh pull core
-```
-
-首次配置远程（clone 后若还没有）：
-
-```bash
-./scripts/repos.sh remotes
-```
-
-## 为什么用 subtree 而不是 submodule
-
-- **目录结构不变**，没有「先进子模块再 commit」的两步流程
-- 伞仓历史完整，方便跨 crate 重构（例如 `ModuleDesc`）
-- 子仓仍有独立 URL，便于单独权限、CI、或以后 crates.io 发布
 
 ## 约定
 
-1. **以伞仓为真相源**：跨 crate 改动只在伞仓开 PR / 提交。
-2. 推子仓前先保证伞仓工作区干净（已提交）。
-3. 子仓默认分支：`main`。
-4. 不要在子仓直接大改再期望自动合并回伞仓；若必须，用 `pull` 后在伞仓解决冲突。
+1. **crate 源码的 commit 发生在子仓库**；伞仓 commit 主要更新 submodule 指针、二进制、`doc/`、`scripts/`。
+2. 子模块默认跟踪远程 `main`。
+3. 不要在未初始化 submodule 的空目录里直接写文件。
+4. 以前的 subtree 远程名 `crate-waver-*` 可删：`git remote remove crate-waver-core` 等（可选清理）。
