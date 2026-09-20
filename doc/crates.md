@@ -22,7 +22,7 @@ waver (bin)
 | 模块 | 职责 |
 |------|------|
 | `graph` | `Graph` / `Node` / `NodeKind` / `Edge` / `PortRef` |
-| `module` | `ModuleDesc` / `MODULE_CATALOG` / `ModuleSection` |
+| `module` | `ModuleDesc` / `MODULE_CATALOG` / `ModuleFamily` |
 | `ports` | `PortCounts`；`port_counts` 委托 desc |
 | `compile` / `schedule` | 拓扑编译 → 只读 `Schedule` |
 | `patch` | `CompiledPatch`、`ParamRegistry`、默认参数 |

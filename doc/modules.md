@@ -1,49 +1,76 @@
 # 模块系统
 
-模块身份由 **`NodeKind` 枚举** 表达；元数据集中在静态 **`ModuleDesc`**。不要再为端口数 / 默认参数 / 侧栏文案维护平行 `match`。
+处理器实现和宿主契约详见 [通用 DSP 模块接口](dsp-interface.md)。
+
+- **类型** = [`ModuleFamily`](../crates/waver-core/src/module.rs)（侧栏分组，可继续加变体）
+- **模块** = [`NodeKind`](../crates/waver-core/src/graph.rs)（IR 身份）；同一 family 下可有多条 [`ModuleDesc`](../crates/waver-core/src/module.rs)
+- 元数据集中在 `MODULE_CATALOG`；`addable: false` 表示计划中（仍可在侧栏看到）
+
+## ModuleFamily（类型）
+
+| 变体 | 侧栏标题 | 当前模块 |
+|------|----------|----------|
+| `Oscillator` | 振荡器 | VCO、**Noise（示范）** |
+| `Filter` | 滤波器 | VCF（计划中） |
+| `AmpEnv` | 放大 / 包络 | VCA、ADSR（计划中） |
+| `Modulation` | 调制 | LFO（计划中） |
+| `Mixer` | 混音 | Mixer（计划中） |
+| `Utility` | 工具 | Delay、Silence |
+| `Io` | 输入 / 输出 | Output |
+
+`ModuleFamily::ALL` 决定侧栏顺序。
 
 ## ModuleDesc
-
-定义见 [`crates/waver-core/src/module.rs`](../crates/waver-core/src/module.rs)。
 
 | 字段 | 用途 |
 |------|------|
 | `kind` | 对应 `NodeKind` |
+| `family` | 所属类型 |
 | `ports` | 输入 / 输出 / 参数个数 |
-| `name` / `code` | 侧栏显示（如「振荡器」「VCO」） |
-| `canvas_label` | 画布节点标题 |
-| `summary` | 节点体内短文案 |
-| `inspector_blurb` | 检查器说明（无自定义 UI 时） |
-| `section` | `Core` / `Utility` / `Planned` |
-| `addable` | 侧栏是否可点击添加 |
+| `name` / `code` | 侧栏显示 |
+| `canvas_label` / `summary` / `inspector_blurb` | 画布与检查器文案 |
+| `addable` | 是否可点击添加 |
 | `param_defaults` / `param_labels` | 长度必须等于 `ports.params` |
 
-`MODULE_CATALOG` 收录全部 kind（含计划中）。`NodeKind::desc()` 用手动下标映射，保持 `const`——**改 catalog 顺序时必须同步 `desc()`**。
+`NodeKind::desc()` 用手动下标映射，保持 `const`——**改 catalog 顺序时必须同步 `desc()`**。
 
-派生 API：
+派生：`port_counts` / `default_param_value` / `param_label` → desc。
 
-- `NodeKind::port_counts()` → `desc().ports`
-- `default_param_value` / `param_label` → desc 参数表
+## DSP 目录（按类型）
 
-## 当前内置
+```
+crates/waver-dsp/src/nodes/
+  mod.rs                 # for_kind
+  oscillator/{vco,noise}.rs
+  utility/{delay,silence}.rs
+  io/output.rs
+```
 
-| Kind | 可添加 | DSP |
-|------|--------|-----|
-| Vco / Output | 是 | 有 |
-| Delay / Silence | 是 | 有（Delay 也会被编译器插环） |
-| Vcf / Vca / Adsr / Lfo / Mixer | 否（Planned） | 无（`for_kind` → `None` → 引擎 Silence） |
+## 添加新**类型**
 
-## 添加新模块清单
+1. 在 `ModuleFamily` 增加变体，并写入 `label()` 与 `ALL`。
+2. （可选）在 `waver-dsp/src/nodes/` 下新建同名目录（如 `filter/`）。
+3. 该类型下再按「添加新模块」挂载具体 `NodeKind`。
 
-1. 在 `graph.rs` 给 `NodeKind` 加变体。
-2. 在 `MODULE_CATALOG` 追加一条 `ModuleDesc`（端口、文案、`section`、`addable`、参数切片）。
-3. 更新 `NodeKind::desc()` 的 match 下标，使之指向新条目。
-4. 在 `waver-dsp/src/nodes/` 实现 `Process`（`process` 内禁止分配 / 锁 / IO）。
-5. 在 `nodes/mod.rs` 的 `for_kind` 里构造实例；有参时从 `ParamRegistry` 取 `Arc<ParamCell>`。
-6. 若需专用控件（旋钮布局、波形选择），扩展 `waver-ui` 的 `editor/`（参考 VCO）；否则侧栏 / 标签会自动出现。
-7. 跑 `cargo test --workspace`；`module` 测试会检查 catalog 覆盖与参数切片长度。
+## 添加新**模块**（已有类型下）
+
+标准示范：**Noise**（`Oscillator` 下第二个模块）。
+
+1. `graph.rs`：`NodeKind` 加变体。
+2. `MODULE_CATALOG` 追加 `ModuleDesc`（填好 `family`、端口、参数）。
+3. 更新 `NodeKind::desc()` 下标。
+4. 在 `nodes/<family>/` 实现 `Process`（`process` 内禁止分配 / 锁 / IO）。
+5. `for_kind` 增加分支。
+6. 无专用画布控件时：侧栏自动出现；检查器对非 VCO 参数用通用滑条（读 `param_labels`）。
+7. `cargo test --workspace`。
+
+对照文件：
+
+- catalog：[`module.rs`](../crates/waver-core/src/module.rs) 中 `Noise` 条目
+- DSP：[`noise.rs`](../crates/waver-dsp/src/nodes/oscillator/noise.rs)
+- 工厂：[`nodes/mod.rs`](../crates/waver-dsp/src/nodes/mod.rs) `for_kind`
 
 ## 工厂约定
 
-- **唯一工厂**：`waver_dsp::for_kind`。引擎 `rebuild` 调用它，失败则 `Silence`。
-- Sink（如 Output）通过 `Process::master_slice` 暴露主总线，供设备写出。
+- **唯一工厂**：`waver_dsp::for_kind`；失败 → 引擎 `Silence`。
+- Sink（Output）通过 `Process::master_slice` 暴露主总线。

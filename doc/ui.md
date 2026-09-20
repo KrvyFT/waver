@@ -4,9 +4,9 @@
 
 [`WaverApp`](../crates/waver-ui/src/app.rs) 三栏：
 
-1. **模块库** — 按 `MODULE_CATALOG` 的 `ModuleSection` 分组；搜索过滤 `name` / `code`；`addable == false` 禁用
+1. **模块库** — 按 `MODULE_CATALOG` 的 `ModuleFamily` 分组；搜索过滤 `name` / `code`；`addable == false` 禁用
 2. **画布** — 节点、线缆、拖拽与连线（`editor/`）
-3. **检查器** — 选中节点参数；VCO 有专用旋钮 / 波形控件，其余多显示 `inspector_blurb`
+3. **检查器** — 选中节点参数；VCO 有专用旋钮 / 波形控件，其余有参数模块显示 `inspector_blurb` 和 0..=1 通用滑条；无参模块只显示说明
 
 顶栏与底栏：运行状态、设备名、节点/线缆计数等。
 

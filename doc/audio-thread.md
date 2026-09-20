@@ -36,7 +36,7 @@ GUI → 音频：`rtrb` SPSC（容量见 `stream.rs`，当前 256）。
 
 允许：读写传入的缓冲切片、读 `ParamCell`、节点内部固定大小状态。
 
-`for_kind` / `rebuild` 在非严格实时路径上，**可以**分配。
+`for_kind` / `rebuild` 当前由音频回调中的 `apply_rt` 调用，仍会分配和释放内存。它们不是后台编译线程路径；整个引擎尚未满足严格实时要求。完整约定见 [通用 DSP 模块接口](dsp-interface.md)。
 
 ## 流生命周期
 

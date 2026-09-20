@@ -53,6 +53,7 @@ git commit -m "chore: bump waver-core" && git push
 |------|------|
 | [doc/architecture.md](doc/architecture.md) | 整体数据流与线程模型 |
 | [doc/crates.md](doc/crates.md) | 各 crate 边界与公共 API |
+| [doc/dsp-interface.md](doc/dsp-interface.md) | 通用 DSP 模块接口、实现示例与宿主限制 |
 | [doc/modules.md](doc/modules.md) | `ModuleDesc` 与如何添加模块 |
 | [doc/audio-thread.md](doc/audio-thread.md) | 实时约束、引擎、命令队列 |
 | [doc/ui.md](doc/ui.md) | 三栏工作区与编辑状态 |
