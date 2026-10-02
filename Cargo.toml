@@ -38,7 +38,12 @@ name = "waver"
 path = "src/main.rs"
 
 [dependencies]
+waver-core.workspace = true
 eframe.workspace = true
 thiserror.workspace = true
 waver-engine.workspace = true
 waver-ui.workspace = true
+
+[features]
+default = []
+asio = ["waver-engine/asio"]
