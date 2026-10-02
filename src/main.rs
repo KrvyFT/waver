@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use eframe::egui;
 use thiserror::Error;
-use waver_engine::spawn_output;
+use waver_engine::{audio_catalog, default_selection, spawn_output, spawn_output_for};
 use waver_ui::WaverApp;
 
 #[derive(Debug, Error)]
@@ -22,18 +22,43 @@ struct AppShell {
 impl eframe::App for AppShell {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.app.ui(ui);
+        if let Some(request) = self.app.take_audio_request() {
+            match request {
+                waver_core::AudioSettingsRequest::Refresh => {
+                    self.app.update_audio_catalog(audio_catalog())
+                }
+                waver_core::AudioSettingsRequest::Apply(selection) => {
+                    let mut candidate = spawn_output_for(&selection);
+                    if let Some(error) = candidate.error.take() {
+                        self.app.audio_switch_failed(error);
+                    } else if let Some(commands) = candidate.take_commands() {
+                        self.app.replace_audio(
+                            commands,
+                            Arc::clone(&candidate.status),
+                            candidate.device_name.clone(),
+                            selection,
+                        );
+                        self._audio = candidate;
+                    } else {
+                        self.app.audio_switch_failed(AppError::Commands.to_string());
+                    }
+                }
+            }
+        }
     }
 }
 
 fn run() -> Result<(), AppError> {
     let mut audio = spawn_output();
     let commands = audio.take_commands().ok_or(AppError::Commands)?;
-    let app = WaverApp::new(
+    let mut app = WaverApp::new(
         commands,
         Arc::clone(&audio.status),
         audio.device_name.clone(),
         audio.error.clone(),
     );
+
+    app.configure_audio_settings(audio_catalog(), default_selection());
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
