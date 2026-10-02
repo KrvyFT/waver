@@ -25,8 +25,9 @@ waver (bin)
 | `module` | `ModuleDesc` / `MODULE_CATALOG` / `ModuleFamily` |
 | `ports` | `PortCounts`；`port_counts` 委托 desc |
 | `compile` / `schedule` | 拓扑编译 → 只读 `Schedule` |
-| `patch` | `CompiledPatch`、`ParamRegistry`、默认参数 |
+| `patch` | `CompiledPatch`、`ParamRegistry`、默认参数与监视缓冲 |
 | `param` | `ParamCell` |
+| `tap` | `ScopeTap`：音频线程写入、GUI 快照的环形监视缓冲 |
 | `command` | `RtCommand` |
 | `status` | `EngineStatus`（原子快照） |
 | `ids` / `error` | `NodeId` / `PortId` / `ParamId`、`GraphError` |
@@ -36,10 +37,10 @@ waver (bin)
 路径：`crates/waver-dsp`
 
 - `Process` / `ProcessCtx`
-- 内置节点：`Vco`、`Output`、`Delay`、`Silence`
+- 内置节点：`Vco`、`Noise`、`Vcf`、`Output`、`Delay`、`Silence`、`Scope`
 - **`for_kind`**：唯一实例化入口（可在 rebuild 时分配）
 
-未实现 kind（VCF 等）返回 `None`；引擎回退为 `Silence`。
+未实现 kind（`Vca` / `Adsr` / `Lfo` / `Mixer`）返回 `None`；引擎回退为 `Silence`。
 
 ## waver-engine
 
